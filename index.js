@@ -1,7 +1,6 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
+const mongoose = require('mongoose');
 
 const client = new Client({
     intents: [
@@ -12,68 +11,51 @@ const client = new Client({
     ]
 });
 
-// Ayarlar dosyasını yükle veya oluştur
-const settingsPath = path.join(__dirname, 'settings.json');
-let settings = {
-    autoRole: null,
-    bannedWords: [],
-    spamThreshold: 5, // 5 mesaj
-    spamInterval: 5000, // 5 saniye
-    spamCooldown: {}
-};
-
-function saveSettings() {
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
+// MongoDB Bağlantısı ve Şeması
+if (process.env.MONGO_URI) {
+    mongoose.connect(process.env.MONGO_URI)
+        .then(() => console.log('MongoDB Bağlantısı Başarılı ✅'))
+        .catch(err => console.error('MongoDB Bağlantı Hatası ❌:', err));
 }
 
-if (fs.existsSync(settingsPath)) {
-    settings = JSON.parse(fs.readFileSync(settingsPath));
-} else {
-    saveSettings();
+const SettingsSchema = new mongoose.Schema({
+    guildId: String,
+    autoRole: String,
+    bannedWords: [String],
+    spamThreshold: { type: Number, default: 5 },
+    spamInterval: { type: Number, default: 5000 }
+});
+
+const Settings = mongoose.model('Settings', SettingsSchema);
+
+async function getSettings(guildId) {
+    let settings = await Settings.findOne({ guildId });
+    if (!settings) {
+        settings = await Settings.create({ guildId, bannedWords: [] });
+    }
+    return settings;
 }
 
 client.on('ready', () => {
     console.log(`${client.user.tag} olarak giriş yapıldı!`);
     
-    // Slash komutlarını tanımla
     const commands = [
         {
             name: 'otorol-ayarla',
             description: 'Otomatik verilecek rolü ayarlar',
-            options: [
-                {
-                    name: 'rol',
-                    type: 8, // ROLE
-                    description: 'Verilecek rol',
-                    required: true
-                }
-            ],
+            options: [{ name: 'rol', type: 8, description: 'Verilecek rol', required: true }],
             default_member_permissions: PermissionFlagsBits.Administrator.toString()
         },
         {
             name: 'kufur-ekle',
             description: 'Yasaklı kelime ekler',
-            options: [
-                {
-                    name: 'kelime',
-                    type: 3, // STRING
-                    description: 'Eklenecek kelime',
-                    required: true
-                }
-            ],
+            options: [{ name: 'kelime', type: 3, description: 'Eklenecek kelime', required: true }],
             default_member_permissions: PermissionFlagsBits.Administrator.toString()
         },
         {
             name: 'kufur-sil',
             description: 'Yasaklı kelime siler',
-            options: [
-                {
-                    name: 'kelime',
-                    type: 3, // STRING
-                    description: 'Silinecek kelime',
-                    required: true
-                }
-            ],
+            options: [{ name: 'kelime', type: 3, description: 'Silinecek kelime', required: true }],
             default_member_permissions: PermissionFlagsBits.Administrator.toString()
         },
         {
@@ -88,13 +70,14 @@ client.on('ready', () => {
 
 // Otorol Sistemi
 client.on('guildMemberAdd', async member => {
+    const settings = await getSettings(member.guild.id);
     if (settings.autoRole) {
         const role = member.guild.roles.cache.get(settings.autoRole);
         if (role) {
             try {
                 await member.roles.add(role);
             } catch (err) {
-                console.error('Otorol verilirken hata oluştu:', err);
+                console.error('Otorol hatası:', err);
             }
         }
     }
@@ -106,6 +89,8 @@ const userMessages = new Map();
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
 
+    const settings = await getSettings(message.guild.id);
+
     // Küfür Engelleyici
     const content = message.content.toLowerCase();
     const hasBannedWord = settings.bannedWords.some(word => content.includes(word.toLowerCase()));
@@ -116,9 +101,7 @@ client.on('messageCreate', async message => {
             const warning = await message.channel.send(`${message.author}, bu kelimeyi kullanmak yasaktır!`);
             setTimeout(() => warning.delete().catch(() => {}), 3000);
             return;
-        } catch (err) {
-            console.error('Mesaj silinirken hata oluştu (Küfür):', err);
-        }
+        } catch (err) { }
     }
 
     // Spam Engelleyici
@@ -132,12 +115,10 @@ client.on('messageCreate', async message => {
     if (recentMessages.length > settings.spamThreshold) {
         try {
             await message.delete();
-            const warning = await message.channel.send(`${message.author}, çok hızlı mesaj gönderiyorsun! Lütfen biraz bekle.`);
+            const warning = await message.channel.send(`${message.author}, çok hızlı mesaj gönderiyorsun!`);
             setTimeout(() => warning.delete().catch(() => {}), 3000);
             return;
-        } catch (err) {
-            console.error('Mesaj silinirken hata oluştu (Spam):', err);
-        }
+        } catch (err) { }
     }
 });
 
@@ -145,12 +126,13 @@ client.on('messageCreate', async message => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, options } = interaction;
+    const { commandName, options, guildId } = interaction;
+    const settings = await getSettings(guildId);
 
     if (commandName === 'otorol-ayarla') {
         const role = options.getRole('rol');
         settings.autoRole = role.id;
-        saveSettings();
+        await settings.save();
         await interaction.reply({ content: `Otorol başarıyla ${role} olarak ayarlandı.`, ephemeral: true });
     }
 
@@ -158,8 +140,8 @@ client.on('interactionCreate', async interaction => {
         const word = options.getString('kelime');
         if (!settings.bannedWords.includes(word)) {
             settings.bannedWords.push(word);
-            saveSettings();
-            await interaction.reply({ content: `"${word}" yasaklı kelimeler listesine eklendi.`, ephemeral: true });
+            await settings.save();
+            await interaction.reply({ content: `"${word}" yasaklı listeye eklendi.`, ephemeral: true });
         } else {
             await interaction.reply({ content: `"${word}" zaten listede var.`, ephemeral: true });
         }
@@ -170,19 +152,18 @@ client.on('interactionCreate', async interaction => {
         const index = settings.bannedWords.indexOf(word);
         if (index > -1) {
             settings.bannedWords.splice(index, 1);
-            saveSettings();
-            await interaction.reply({ content: `"${word}" yasaklı kelimeler listesinden silindi.`, ephemeral: true });
+            await settings.save();
+            await interaction.reply({ content: `"${word}" listeden silindi.`, ephemeral: true });
         } else {
-            await interaction.reply({ content: `"${word}" listede bulunamadı.`, ephemeral: true });
+            await interaction.reply({ content: `"${word}" bulunamadı.`, ephemeral: true });
         }
     }
 
     if (commandName === 'kufur-liste') {
         if (settings.bannedWords.length === 0) {
-            return interaction.reply({ content: 'Henüz yasaklı kelime eklenmemiş.', ephemeral: true });
+            return interaction.reply({ content: 'Yasaklı kelime yok.', ephemeral: true });
         }
-        const list = settings.bannedWords.join(', ');
-        await interaction.reply({ content: `**Yasaklı Kelimeler:**\n${list}`, ephemeral: true });
+        await interaction.reply({ content: `**Yasaklı Kelimeler:**\n${settings.bannedWords.join(', ')}`, ephemeral: true });
     }
 });
 
