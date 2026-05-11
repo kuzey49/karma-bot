@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionFlagsBits, Routes, REST } = require('discord.js');
 const mongoose = require('mongoose');
 const express = require('express');
 
@@ -17,7 +17,7 @@ const client = new Client({
     ]
 });
 
-// MongoDB ve Şema
+// MongoDB Bağlantısı
 if (process.env.MONGO_URI) {
     mongoose.connect(process.env.MONGO_URI)
         .then(() => console.log('MongoDB Bağlantısı Başarılı ✅'))
@@ -53,67 +53,74 @@ async function updateMemberCount(guild) {
     }
 }
 
-client.on('ready', () => {
+// Komutları Hemen Kaydetme (Fast Refresh)
+const commands = [
+    {
+        name: 'otorol-ayarla',
+        description: 'Otomatik verilecek rolü ayarlar',
+        options: [{ name: 'rol', type: 8, description: 'Verilecek rol', required: true }],
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'panel-ayarla',
+        description: 'Üye sayısı kanalını ayarlar',
+        options: [{ name: 'kanal', type: 7, description: 'Ses kanalı seçin', required: true }],
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'hosgeldin-ayarla',
+        description: 'Hoş geldin mesajını ve kanalını ayarlar',
+        options: [
+            { name: 'kanal', type: 7, description: 'Hangi kanala gitsin?', required: true },
+            { name: 'mesaj', type: 3, description: 'Mesaj (Etiket için {üye} yazın)', required: true }
+        ],
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'gorusuruz-ayarla',
+        description: 'Görüşürüz mesajını ve kanalını ayarlar',
+        options: [
+            { name: 'kanal', type: 7, description: 'Hangi kanala gitsin?', required: true },
+            { name: 'mesaj', type: 3, description: 'Mesaj (İsim için {üye} yazın)', required: true }
+        ],
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'ban',
+        description: 'Üyeyi yasaklar',
+        options: [
+            { name: 'kisi', type: 6, description: 'Yasaklanacak kişi', required: true },
+            { name: 'sebep', type: 3, description: 'Yasaklama sebebi', required: false }
+        ],
+        default_member_permissions: PermissionFlagsBits.BanMembers.toString()
+    },
+    {
+        name: 'kufur-ekle',
+        description: 'Yasaklı kelime ekler',
+        options: [{ name: 'kelime', type: 3, description: 'Eklenecek kelime', required: true }],
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'kufur-sil',
+        description: 'Yasaklı kelime siler',
+        options: [{ name: 'kelime', type: 3, description: 'Silinecek kelime', required: true }],
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'kufur-liste',
+        description: 'Yasaklı kelimeleri listeler',
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    }
+];
+
+const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
+client.on('ready', async () => {
     console.log(`${client.user.tag} hazır!`);
-    const commands = [
-        {
-            name: 'otorol-ayarla',
-            description: 'Otomatik rolü ayarlar',
-            options: [{ name: 'rol', type: 8, description: 'Rol', required: true }],
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        },
-        {
-            name: 'panel-ayarla',
-            description: 'Üye sayısı kanalını ayarlar',
-            options: [{ name: 'kanal', type: 7, description: 'Ses kanalı', required: true }],
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        },
-        {
-            name: 'hosgeldin-ayarla',
-            description: 'Hoş geldin mesajını ve kanalını ayarlar',
-            options: [
-                { name: 'kanal', type: 7, description: 'Kanal', required: true },
-                { name: 'mesaj', type: 3, description: 'Mesaj (Etiket için {üye} kullanın)', required: true }
-            ],
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        },
-        {
-            name: 'gorusuruz-ayarla',
-            description: 'Görüşürüz mesajını ve kanalını ayarlar',
-            options: [
-                { name: 'kanal', type: 7, description: 'Kanal', required: true },
-                { name: 'mesaj', type: 3, description: 'Mesaj (Etiket için {üye} kullanın)', required: true }
-            ],
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        },
-        {
-            name: 'ban',
-            description: 'Üyeyi yasaklar',
-            options: [
-                { name: 'kisi', type: 6, description: 'Kişi', required: true },
-                { name: 'sebep', type: 3, description: 'Sebep', required: false }
-            ],
-            default_member_permissions: PermissionFlagsBits.BanMembers.toString()
-        },
-        {
-            name: 'kufur-ekle',
-            description: 'Yasaklı kelime ekler',
-            options: [{ name: 'kelime', type: 3, description: 'Kelime', required: true }],
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        },
-        {
-            name: 'kufur-sil',
-            description: 'Yasaklı kelime siler',
-            options: [{ name: 'kelime', type: 3, description: 'Kelime', required: true }],
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        },
-        {
-            name: 'kufur-liste',
-            description: 'Yasaklı kelimeler',
-            default_member_permissions: PermissionFlagsBits.Administrator.toString()
-        }
-    ];
-    client.application.commands.set(commands);
+    try {
+        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+        console.log('Tüm komutlar başarıyla yüklendi! ✅');
+    } catch (error) { console.error('Komut yükleme hatası:', error); }
 });
 
 client.on('guildMemberAdd', async member => {
@@ -125,7 +132,7 @@ client.on('guildMemberAdd', async member => {
     if (settings.welcomeChannelId && settings.welcomeMessage) {
         const channel = member.guild.channels.cache.get(settings.welcomeChannelId);
         if (channel) {
-            const msg = settings.welcomeMessage.replace('{üye}', `${member}`);
+            const msg = settings.welcomeMessage.replace('{üye}', `<@${member.id}>`);
             channel.send(msg).catch(() => {});
         }
     }
@@ -137,7 +144,7 @@ client.on('guildMemberRemove', async member => {
     if (settings.leaveChannelId && settings.leaveMessage) {
         const channel = member.guild.channels.cache.get(settings.leaveChannelId);
         if (channel) {
-            const msg = settings.leaveMessage.replace('{üye}', `${member.user.tag}`);
+            const msg = settings.leaveMessage.replace('{üye}', `**${member.user.tag}**`);
             channel.send(msg).catch(() => {});
         }
     }
@@ -184,19 +191,19 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'panel-ayarla') {
         settings.memberCountChannelId = options.getChannel('kanal').id;
         await settings.save(); await updateMemberCount(guild);
-        await interaction.reply({ content: `Panel ayarlandı.`, ephemeral: true });
+        await interaction.reply({ content: `Üye panel kanalı ayarlandı.`, ephemeral: true });
     }
     if (commandName === 'hosgeldin-ayarla') {
         settings.welcomeChannelId = options.getChannel('kanal').id;
         settings.welcomeMessage = options.getString('mesaj');
         await settings.save();
-        await interaction.reply({ content: `Hoş geldin sistemi aktif! Kanal: ${options.getChannel('kanal')}`, ephemeral: true });
+        await interaction.reply({ content: `Hoş geldin sistemi aktif!`, ephemeral: true });
     }
     if (commandName === 'gorusuruz-ayarla') {
         settings.leaveChannelId = options.getChannel('kanal').id;
         settings.leaveMessage = options.getString('mesaj');
         await settings.save();
-        await interaction.reply({ content: `Görüşürüz sistemi aktif! Kanal: ${options.getChannel('kanal')}`, ephemeral: true });
+        await interaction.reply({ content: `Görüşürüz sistemi aktif!`, ephemeral: true });
     }
     if (commandName === 'ban') {
         const user = options.getUser('kisi');
@@ -218,7 +225,7 @@ client.on('interactionCreate', async interaction => {
         else await interaction.reply({ content: `Bulunamadı.`, ephemeral: true });
     }
     if (commandName === 'kufur-liste') {
-        if (settings.bannedWords.length === 0) return interaction.reply({ content: 'Boş.', ephemeral: true });
+        if (settings.bannedWords.length === 0) return interaction.reply({ content: 'Liste boş.', ephemeral: true });
         await interaction.reply({ content: `**Yasaklı Kelimeler:**\n${settings.bannedWords.join(', ')}`, ephemeral: true });
     }
 });
