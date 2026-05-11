@@ -70,7 +70,7 @@ const commands = [
         name: 'hosgeldin-ayarla',
         description: 'Hoş geldin mesajını ayarlar',
         options: [
-            { name: 'kanal', type: 7, description: 'Hangi kanala gitsin?', required: true },
+            { name: 'kanal', type: 7, description: 'Kanal', required: true },
             { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı)', required: true }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
@@ -79,8 +79,8 @@ const commands = [
         name: 'gorusuruz-ayarla',
         description: 'Görüşürüz mesajını ayarlar',
         options: [
-            { name: 'kanal', type: 7, description: 'Hangi kanala gitsin?', required: true },
-            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: isim, {sayı}: üye sayısı)', required: true }
+            { name: 'kanal', type: 7, description: 'Kanal', required: true },
+            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı)', required: true }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
@@ -88,8 +88,8 @@ const commands = [
         name: 'ban',
         description: 'Üyeyi yasaklar',
         options: [
-            { name: 'kisi', type: 6, description: 'Yasaklanacak kişi', required: true },
-            { name: 'sebep', type: 3, description: 'Yasaklama sebebi', required: false }
+            { name: 'kisi', type: 6, description: 'Kanal', required: true },
+            { name: 'sebep', type: 3, description: 'Sebep', required: false }
         ],
         default_member_permissions: PermissionFlagsBits.BanMembers.toString()
     },
@@ -145,8 +145,9 @@ client.on('guildMemberRemove', async member => {
     if (settings.leaveChannelId && settings.leaveMessage) {
         const channel = member.guild.channels.cache.get(settings.leaveChannelId);
         if (channel) {
+            // Çıkan kişiyi de ID üzerinden etiketle (etiket görünür kalır)
             const msg = settings.leaveMessage
-                .replace('{üye}', `**${member.user.tag}**`)
+                .replace('{üye}', `<@${member.id}>`)
                 .replace('{sayı}', member.guild.memberCount);
             channel.send(msg).catch(() => {});
         }
@@ -194,7 +195,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'panel-ayarla') {
         settings.memberCountChannelId = options.getChannel('kanal').id;
         await settings.save(); await updateMemberCount(guild);
-        await interaction.reply({ content: `Panel ayarlandı.`, ephemeral: true });
+        await interaction.reply({ content: `Üye panel kanalı ayarlandı.`, ephemeral: true });
     }
     if (commandName === 'hosgeldin-ayarla') {
         settings.welcomeChannelId = options.getChannel('kanal').id;
