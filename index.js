@@ -1,6 +1,19 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
 const mongoose = require('mongoose');
+const express = require('express');
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Web sunucusu (UptimeRobot için)
+app.get('/', (req, res) => {
+  res.send('Bot aktif ve çalışıyor! 🚀');
+});
+
+app.listen(port, () => {
+  console.log(`Web sunucusu ${port} portunda aktif.`);
+});
 
 const client = new Client({
     intents: [
@@ -11,7 +24,7 @@ const client = new Client({
     ]
 });
 
-// MongoDB Bağlantısı ve Şeması
+// MongoDB Bağlantısı
 if (process.env.MONGO_URI) {
     mongoose.connect(process.env.MONGO_URI)
         .then(() => console.log('MongoDB Bağlantısı Başarılı ✅'))
@@ -76,9 +89,7 @@ client.on('guildMemberAdd', async member => {
         if (role) {
             try {
                 await member.roles.add(role);
-            } catch (err) {
-                console.error('Otorol hatası:', err);
-            }
+            } catch (err) { }
         }
     }
 });
@@ -91,7 +102,6 @@ client.on('messageCreate', async message => {
 
     const settings = await getSettings(message.guild.id);
 
-    // Küfür Engelleyici
     const content = message.content.toLowerCase();
     const hasBannedWord = settings.bannedWords.some(word => content.includes(word.toLowerCase()));
     
@@ -104,7 +114,6 @@ client.on('messageCreate', async message => {
         } catch (err) { }
     }
 
-    // Spam Engelleyici
     const now = Date.now();
     const timestamps = userMessages.get(message.author.id) || [];
     timestamps.push(now);
@@ -122,7 +131,6 @@ client.on('messageCreate', async message => {
     }
 });
 
-// Komut İşlemleri
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
