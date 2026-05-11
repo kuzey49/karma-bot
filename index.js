@@ -53,7 +53,6 @@ async function updateMemberCount(guild) {
     }
 }
 
-// Komutları Hemen Kaydetme (Fast Refresh)
 const commands = [
     {
         name: 'otorol-ayarla',
@@ -69,19 +68,19 @@ const commands = [
     },
     {
         name: 'hosgeldin-ayarla',
-        description: 'Hoş geldin mesajını ve kanalını ayarlar',
+        description: 'Hoş geldin mesajını ayarlar',
         options: [
             { name: 'kanal', type: 7, description: 'Hangi kanala gitsin?', required: true },
-            { name: 'mesaj', type: 3, description: 'Mesaj (Etiket için {üye} yazın)', required: true }
+            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı)', required: true }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
     {
         name: 'gorusuruz-ayarla',
-        description: 'Görüşürüz mesajını ve kanalını ayarlar',
+        description: 'Görüşürüz mesajını ayarlar',
         options: [
             { name: 'kanal', type: 7, description: 'Hangi kanala gitsin?', required: true },
-            { name: 'mesaj', type: 3, description: 'Mesaj (İsim için {üye} yazın)', required: true }
+            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: isim, {sayı}: üye sayısı)', required: true }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
@@ -97,18 +96,18 @@ const commands = [
     {
         name: 'kufur-ekle',
         description: 'Yasaklı kelime ekler',
-        options: [{ name: 'kelime', type: 3, description: 'Eklenecek kelime', required: true }],
+        options: [{ name: 'kelime', type: 3, description: 'Kelime', required: true }],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
     {
         name: 'kufur-sil',
         description: 'Yasaklı kelime siler',
-        options: [{ name: 'kelime', type: 3, description: 'Silinecek kelime', required: true }],
+        options: [{ name: 'kelime', type: 3, description: 'Kelime', required: true }],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
     {
         name: 'kufur-liste',
-        description: 'Yasaklı kelimeleri listeler',
+        description: 'Yasaklı kelimeler',
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     }
 ];
@@ -119,8 +118,8 @@ client.on('ready', async () => {
     console.log(`${client.user.tag} hazır!`);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('Tüm komutlar başarıyla yüklendi! ✅');
-    } catch (error) { console.error('Komut yükleme hatası:', error); }
+        console.log('Komutlar yüklendi! ✅');
+    } catch (error) { console.error(error); }
 });
 
 client.on('guildMemberAdd', async member => {
@@ -132,7 +131,9 @@ client.on('guildMemberAdd', async member => {
     if (settings.welcomeChannelId && settings.welcomeMessage) {
         const channel = member.guild.channels.cache.get(settings.welcomeChannelId);
         if (channel) {
-            const msg = settings.welcomeMessage.replace('{üye}', `<@${member.id}>`);
+            const msg = settings.welcomeMessage
+                .replace('{üye}', `<@${member.id}>`)
+                .replace('{sayı}', member.guild.memberCount);
             channel.send(msg).catch(() => {});
         }
     }
@@ -144,7 +145,9 @@ client.on('guildMemberRemove', async member => {
     if (settings.leaveChannelId && settings.leaveMessage) {
         const channel = member.guild.channels.cache.get(settings.leaveChannelId);
         if (channel) {
-            const msg = settings.leaveMessage.replace('{üye}', `**${member.user.tag}**`);
+            const msg = settings.leaveMessage
+                .replace('{üye}', `**${member.user.tag}**`)
+                .replace('{sayı}', member.guild.memberCount);
             channel.send(msg).catch(() => {});
         }
     }
@@ -191,7 +194,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'panel-ayarla') {
         settings.memberCountChannelId = options.getChannel('kanal').id;
         await settings.save(); await updateMemberCount(guild);
-        await interaction.reply({ content: `Üye panel kanalı ayarlandı.`, ephemeral: true });
+        await interaction.reply({ content: `Panel ayarlandı.`, ephemeral: true });
     }
     if (commandName === 'hosgeldin-ayarla') {
         settings.welcomeChannelId = options.getChannel('kanal').id;
