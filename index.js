@@ -14,7 +14,37 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildVoiceStates,
     ]
+});
+
+const { DisTube } = require('distube');
+const { SpotifyPlugin } = require('@distube/spotify');
+const { ytDlpPlugin } = require('@distube/yt-dlp');
+
+const distube = new DisTube(client, {
+    plugins: [
+        new SpotifyPlugin({
+            emitEventsAfterFetching: true,
+        }),
+        new ytDlpPlugin()
+    ],
+    emitNewSongOnly: true,
+    leaveOnEmpty: true,
+    leaveOnFinish: true,
+});
+
+distube.on('playSong', (queue, song) => {
+    queue.textChannel.send(`🎶 Şu an çalıyor: **${song.name}** - \`${song.formattedDuration}\`\nİsteyen: ${song.user}`);
+});
+
+distube.on('addSong', (queue, song) => {
+    queue.textChannel.send(`✅ Sıraya eklendi: **${song.name}** - \`${song.formattedDuration}\``);
+});
+
+distube.on('error', (channel, e) => {
+    if (channel) channel.send(`❌ Hata: ${e.message.slice(0, 2000)}`);
+    else console.error(e);
 });
 
 // MongoDB Bağlantısı
@@ -133,6 +163,19 @@ const commands = [
             { name: 'odul', type: 3, description: 'Ödül', required: true }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'oynat',
+        description: 'Şarkı çalar (YouTube veya Spotify)',
+        options: [{ name: 'şarkı', type: 3, description: 'Şarkı adı veya link', required: true }]
+    },
+    {
+        name: 'atla',
+        description: 'Sıradaki şarkıya geçer'
+    },
+    {
+        name: 'durdur',
+        description: 'Müziği tamamen durdurur'
     }
 ];
 
@@ -377,6 +420,46 @@ client.on('interactionCreate', async interaction => {
             await msg.edit({ embeds: [winEmbed], components: [] });
             interaction.channel.send(`Tebrikler ${winnerMention}! **${prize}** çekilişini kazandınız! 🎉`);
         });
+    }
+
+    // Müzik Komutları
+    if (commandName === 'oynat') {
+        const query = options.getString('şarkı');
+        const voiceChannel = interaction.member.voice.channel;
+        
+        if (!voiceChannel) return interaction.reply({ content: 'Önce bir ses kanalına katılmalısın!', ephemeral: true });
+        
+        await interaction.reply({ content: '🔍 Şarkı aranıyor...', ephemeral: true });
+        
+        try {
+            await distube.play(voiceChannel, query, {
+                textChannel: interaction.channel,
+                member: interaction.member
+            });
+            await interaction.editReply({ content: '✅ İstek işleniyor...' });
+        } catch (err) {
+            await interaction.editReply({ content: `❌ Hata oluştu: ${err.message}` });
+        }
+    }
+    
+    if (commandName === 'atla') {
+        const queue = distube.getQueue(guildId);
+        if (!queue) return interaction.reply({ content: 'Şu an çalan bir şey yok!', ephemeral: true });
+        
+        try {
+            await distube.skip(guildId);
+            await interaction.reply({ content: '⏭️ Şarkı atlandı.' });
+        } catch (err) {
+            await interaction.reply({ content: '⚠️ Sırada başka şarkı yok!', ephemeral: true });
+        }
+    }
+    
+    if (commandName === 'durdur') {
+        const queue = distube.getQueue(guildId);
+        if (!queue) return interaction.reply({ content: 'Şu an çalan bir şey yok!', ephemeral: true });
+        
+        await distube.stop(guildId);
+        await interaction.reply({ content: '⏹️ Müzik durduruldu ve kanaldan çıkıldı.' });
     }
 });
 
