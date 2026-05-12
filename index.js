@@ -34,6 +34,14 @@ const distube = new DisTube(client, {
     ],
     ffmpeg: {
         path: require('ffmpeg-static')
+    },
+    ytdlOptions: {
+        highWaterMark: 1 << 25,
+        filter: 'audioonly',
+        quality: 'highestaudio',
+        headers: process.env.YOUTUBE_COOKIES ? {
+            Cookie: process.env.YOUTUBE_COOKIES
+        } : {}
     }
 });
 
