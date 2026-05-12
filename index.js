@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionFlagsBits, Routes, REST } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionFlagsBits, Routes, REST, EmbedBuilder } = require('discord.js');
 const mongoose = require('mongoose');
 const express = require('express');
 
@@ -31,8 +31,10 @@ const SettingsSchema = new mongoose.Schema({
     memberCountChannelId: String,
     welcomeChannelId: String,
     welcomeMessage: String,
+    welcomeImage: String,
     leaveChannelId: String,
     leaveMessage: String,
+    leaveImage: String,
     spamThreshold: { type: Number, default: 5 },
     spamInterval: { type: Number, default: 5000 }
 });
@@ -48,7 +50,7 @@ async function getSettings(guildId) {
 async function updateMemberCount(guild) {
     const settings = await getSettings(guild.id);
     if (settings.memberCountChannelId) {
-        const channel = guild.channels.cache.get(settings.memberCountChannelId);
+        const channel = await guild.channels.fetch(settings.memberCountChannelId).catch(() => null);
         if (channel) await channel.setName(`Üye Sayısı • ${guild.memberCount}`).catch(() => {});
     }
 }
@@ -71,7 +73,8 @@ const commands = [
         description: 'Hoş geldin mesajını ayarlar',
         options: [
             { name: 'kanal', type: 7, description: 'Kanal', required: true },
-            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı)', required: true }
+            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı, {sunucu}: sunucu ismi)', required: true },
+            { name: 'resim', type: 3, description: 'Resim URL (opsiyonel)', required: false }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
@@ -80,7 +83,8 @@ const commands = [
         description: 'Görüşürüz mesajını ayarlar',
         options: [
             { name: 'kanal', type: 7, description: 'Kanal', required: true },
-            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı)', required: true }
+            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı, {sunucu}: sunucu ismi)', required: true },
+            { name: 'resim', type: 3, description: 'Resim URL (opsiyonel)', required: false }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     },
@@ -124,17 +128,32 @@ client.on('ready', async () => {
 
 client.on('guildMemberAdd', async member => {
     const settings = await getSettings(member.guild.id);
+    
+    // Otorol
     if (settings.autoRole) {
         const role = member.guild.roles.cache.get(settings.autoRole);
         if (role) await member.roles.add(role).catch(() => {});
     }
+
+    // Hoş geldin Mesajı
     if (settings.welcomeChannelId && settings.welcomeMessage) {
-        const channel = member.guild.channels.cache.get(settings.welcomeChannelId);
+        const channel = await member.guild.channels.fetch(settings.welcomeChannelId).catch(() => null);
         if (channel) {
-            const msg = settings.welcomeMessage
-                .replace('{üye}', `<@${member.id}>`)
-                .replace('{sayı}', member.guild.memberCount);
-            channel.send(msg).catch(() => {});
+            const formattedMsg = settings.welcomeMessage
+                .replaceAll('{üye}', `<@${member.id}>`)
+                .replaceAll('{sayı}', member.guild.memberCount.toString())
+                .replaceAll('{sunucu}', member.guild.name);
+
+            const embed = new EmbedBuilder()
+                .setColor('#00ff00')
+                .setTitle(`Sunucumuza Hoş Geldin!`)
+                .setDescription(formattedMsg)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setTimestamp();
+
+            if (settings.welcomeImage) embed.setImage(settings.welcomeImage);
+
+            channel.send({ content: `<@${member.id}>`, embeds: [embed] }).catch(() => {});
         }
     }
     await updateMemberCount(member.guild);
@@ -143,13 +162,23 @@ client.on('guildMemberAdd', async member => {
 client.on('guildMemberRemove', async member => {
     const settings = await getSettings(member.guild.id);
     if (settings.leaveChannelId && settings.leaveMessage) {
-        const channel = member.guild.channels.cache.get(settings.leaveChannelId);
+        const channel = await member.guild.channels.fetch(settings.leaveChannelId).catch(() => null);
         if (channel) {
-            // Çıkan kişiyi de ID üzerinden etiketle (etiket görünür kalır)
-            const msg = settings.leaveMessage
-                .replace('{üye}', `<@${member.id}>`)
-                .replace('{sayı}', member.guild.memberCount);
-            channel.send(msg).catch(() => {});
+            const formattedMsg = settings.leaveMessage
+                .replaceAll('{üye}', `**${member.user.tag}**`)
+                .replaceAll('{sayı}', member.guild.memberCount.toString())
+                .replaceAll('{sunucu}', member.guild.name);
+
+            const embed = new EmbedBuilder()
+                .setColor('#ff0000')
+                .setTitle(`Görüşürüz!`)
+                .setDescription(formattedMsg)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setTimestamp();
+
+            if (settings.leaveImage) embed.setImage(settings.leaveImage);
+
+            channel.send({ embeds: [embed] }).catch(() => {});
         }
     }
     await updateMemberCount(member.guild);
@@ -200,14 +229,16 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'hosgeldin-ayarla') {
         settings.welcomeChannelId = options.getChannel('kanal').id;
         settings.welcomeMessage = options.getString('mesaj');
+        settings.welcomeImage = options.getString('resim') || null;
         await settings.save();
-        await interaction.reply({ content: `Hoş geldin sistemi aktif!`, ephemeral: true });
+        await interaction.reply({ content: `Hoş geldin sistemi ayarlandı! Metin: ${settings.welcomeMessage}`, ephemeral: true });
     }
     if (commandName === 'gorusuruz-ayarla') {
         settings.leaveChannelId = options.getChannel('kanal').id;
         settings.leaveMessage = options.getString('mesaj');
+        settings.leaveImage = options.getString('resim') || null;
         await settings.save();
-        await interaction.reply({ content: `Görüşürüz sistemi aktif!`, ephemeral: true });
+        await interaction.reply({ content: `Görüşürüz sistemi ayarlandı! Metin: ${settings.leaveMessage}`, ephemeral: true });
     }
     if (commandName === 'ban') {
         const user = options.getUser('kisi');
