@@ -31,7 +31,10 @@ const distube = new DisTube(client, {
             } : null
         }),
         new YtDlpPlugin()
-    ]
+    ],
+    ffmpeg: {
+        path: require('ffmpeg-static')
+    }
 });
 
 distube.on('playSong', (queue, song) => {
