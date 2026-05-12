@@ -47,8 +47,17 @@ distube.on('addSong', (queue, song) => {
 });
 
 distube.on('error', (channel, e) => {
-    if (channel) channel.send(`❌ Hata: ${e.message.slice(0, 2000)}`);
-    else console.error(e);
+    if (channel && typeof channel.send === 'function') channel.send(`❌ Hata: ${e.message.slice(0, 2000)}`);
+    else console.error('DisTube Hatası:', e);
+});
+
+// Çökmemesi ve hatayı loglaması için hata yakalayıcılar
+process.on('unhandledRejection', error => {
+    console.error('Yakalanmamış Söz Verme Hatası:', error);
+});
+
+process.on('uncaughtException', error => {
+    console.error('Yakalanmamış İstisna Hatası:', error);
 });
 
 // MongoDB Bağlantısı
@@ -391,9 +400,8 @@ client.on('interactionCreate', async interaction => {
                 .setStyle(ButtonStyle.Primary)
         );
         
-        const msg = await interaction.reply({ embeds: [embed], components: [row], withResponse: true });
-        // Eski sürüm desteği için interaction.fetchReply() kullanılabilir veya msg.resource.message
-        const actualMsg = msg.resource ? msg.resource.message : await interaction.fetchReply();
+        await interaction.reply({ embeds: [embed], components: [row] });
+        const actualMsg = await interaction.fetchReply();
         
         const participants = new Set();
         const collector = actualMsg.createMessageComponentCollector({ time: ms });
