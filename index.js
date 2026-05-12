@@ -20,7 +20,7 @@ const client = new Client({
 
 const { DisTube } = require('distube');
 const { SpotifyPlugin } = require('@distube/spotify');
-const { ytDlpPlugin } = require('@distube/yt-dlp');
+const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 const distube = new DisTube(client, {
     plugins: [
@@ -30,7 +30,7 @@ const distube = new DisTube(client, {
                 clientSecret: process.env.SPOTIFY_SECRET,
             } : null
         }),
-        new ytDlpPlugin()
+        new YtDlpPlugin()
     ],
     emitNewSongOnly: true,
     leaveOnEmpty: true,
