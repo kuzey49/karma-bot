@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionFlagsBits, Routes, REST, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionFlagsBits, Routes, REST, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const mongoose = require('mongoose');
 const express = require('express');
 
@@ -112,6 +112,26 @@ const commands = [
     {
         name: 'kufur-liste',
         description: 'Yasaklı kelimeler',
+        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+    },
+    {
+        name: 'sil',
+        description: 'Belirtilen miktarda mesajı siler',
+        options: [{ name: 'miktar', type: 4, description: 'Silinecek mesaj sayısı (1-100)', required: true }],
+        default_member_permissions: PermissionFlagsBits.ManageMessages.toString()
+    },
+    {
+        name: 'sunucu-bilgi',
+        description: 'Sunucu hakkında bilgi verir'
+    },
+    {
+        name: 'cekilis-baslat',
+        description: 'Çekiliş başlatır',
+        options: [
+            { name: 'sure', type: 3, description: 'Süre (örnek: 1m, 1h, 1d)', required: true },
+            { name: 'kazanan', type: 4, description: 'Kazanan sayısı', required: true },
+            { name: 'odul', type: 3, description: 'Ödül', required: true }
+        ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     }
 ];
@@ -269,6 +289,94 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'kufur-liste') {
         if (settings.bannedWords.length === 0) return interaction.reply({ content: 'Liste boş.', ephemeral: true });
         await interaction.reply({ content: `**Yasaklı Kelimeler:**\n${settings.bannedWords.join(', ')}`, ephemeral: true });
+    }
+    if (commandName === 'sil') {
+        const amount = options.getInteger('miktar');
+        if (amount < 1 || amount > 100) return interaction.reply({ content: '1 ile 100 arasında bir miktar belirtin.', ephemeral: true });
+        
+        await interaction.channel.bulkDelete(amount, true).catch(err => {
+            return interaction.reply({ content: 'Mesajlar silinirken bir hata oluştu (14 günden eski mesajlar silinemez).', ephemeral: true });
+        });
+        
+        await interaction.reply({ content: `${amount} adet mesaj başarıyla silindi.`, ephemeral: true });
+    }
+    if (commandName === 'sunucu-bilgi') {
+        const { members, channels, roles, createdAt, ownerId } = guild;
+        const embed = new EmbedBuilder()
+            .setTitle(`${guild.name} - Sunucu Bilgileri`)
+            .setThumbnail(guild.iconURL({ dynamic: true }))
+            .addFields(
+                { name: '👑 Sahibi', value: `<@${ownerId}>`, inline: true },
+                { name: '👥 Üyeler', value: `${guild.memberCount}`, inline: true },
+                { name: '💬 Kanallar', value: `${channels.cache.size}`, inline: true },
+                { name: '🛡️ Roller', value: `${roles.cache.size}`, inline: true },
+                { name: '📅 Kuruluş', value: `<t:${Math.floor(createdAt.getTime() / 1000)}:R>`, inline: true }
+            )
+            .setColor('Blue')
+            .setTimestamp();
+        await interaction.reply({ embeds: [embed] });
+    }
+    if (commandName === 'cekilis-baslat') {
+        const durationStr = options.getString('sure');
+        const winnerCount = options.getInteger('kazanan');
+        const prize = options.getString('odul');
+        
+        const timeUnits = { 'm': 60000, 'h': 3600000, 'd': 86400000 };
+        const unit = durationStr.slice(-1);
+        const time = parseInt(durationStr.slice(0, -1));
+        
+        if (isNaN(time) || !timeUnits[unit]) return interaction.reply({ content: 'Geçersiz süre formatı! Örnek: 10m, 1h, 1d', ephemeral: true });
+        
+        const ms = time * timeUnits[unit];
+        const endTimestamp = Math.floor((Date.now() + ms) / 1000);
+        
+        const embed = new EmbedBuilder()
+            .setTitle('🎉 Çekiliş Başladı! 🎉')
+            .setDescription(`Ödül: **${prize}**\nBitiş: <t:${endTimestamp}:R>\nDüzenleyen: ${interaction.user}\nKazanan Sayısı: **${winnerCount}**`)
+            .setColor('Gold')
+            .setFooter({ text: 'Katılmak için aşağıdaki butona basın!' });
+            
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('cekilis-katil')
+                .setEmoji('🎉')
+                .setLabel('Katıl')
+                .setStyle(ButtonStyle.Primary)
+        );
+        
+        const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+        
+        const participants = new Set();
+        const collector = msg.createMessageComponentCollector({ time: ms });
+        
+        collector.on('collect', i => {
+            if (i.customId === 'cekilis-katil') {
+                if (participants.has(i.user.id)) {
+                    return i.reply({ content: 'Zaten çekilişe katıldın!', ephemeral: true });
+                }
+                participants.add(i.user.id);
+                i.reply({ content: 'Başarıyla katıldın! 🎉', ephemeral: true });
+            }
+        });
+        
+        collector.on('end', async () => {
+            const winners = Array.from(participants).sort(() => 0.5 - Math.random()).slice(0, winnerCount);
+            
+            if (winners.length === 0) {
+                await msg.edit({ components: [] });
+                return interaction.channel.send(`Çekiliş sona erdi! Maalesef kimse katılmadı. Ödül: **${prize}**`);
+            }
+            
+            const winnerMention = winners.map(id => `<@${id}>`).join(', ');
+            const winEmbed = new EmbedBuilder()
+                .setTitle('🎉 Çekiliş Sona Erdi! 🎉')
+                .setDescription(`Ödül: **${prize}**\nKazananlar: ${winnerMention}\nDüzenleyen: ${interaction.user}`)
+                .setColor('Green')
+                .setTimestamp();
+                
+            await msg.edit({ embeds: [winEmbed], components: [] });
+            interaction.channel.send(`Tebrikler ${winnerMention}! **${prize}** çekilişini kazandınız! 🎉`);
+        });
     }
 });
 
