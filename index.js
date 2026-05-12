@@ -447,10 +447,12 @@ client.on('interactionCreate', async interaction => {
         try {
             await distube.play(voiceChannel, query, {
                 textChannel: interaction.channel,
-                member: interaction.member
+                member: interaction.member,
+                interaction
             });
-            await interaction.editReply({ content: '✅ İstek işleniyor...' });
+            // Başarılı olursa distube "playSong" event'ini tetikleyecek
         } catch (err) {
+            console.error('Müzik Çalma Hatası:', err);
             await interaction.editReply({ content: `❌ Hata oluştu: ${err.message}` });
         }
     }
