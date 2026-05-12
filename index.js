@@ -25,7 +25,6 @@ const { ytDlpPlugin } = require('@distube/yt-dlp');
 const distube = new DisTube(client, {
     plugins: [
         new SpotifyPlugin({
-            emitEventsAfterFetching: true,
             api: process.env.SPOTIFY_ID ? {
                 clientId: process.env.SPOTIFY_ID,
                 clientSecret: process.env.SPOTIFY_SECRET,
