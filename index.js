@@ -20,7 +20,7 @@ const client = new Client({
 
 const { DisTube } = require('distube');
 const { SpotifyPlugin } = require('@distube/spotify');
-const { SoundcloudPlugin } = require('@distube/soundcloud');
+const { SoundCloudPlugin } = require('@distube/soundcloud');
 const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 const distube = new DisTube(client, {
@@ -31,7 +31,7 @@ const distube = new DisTube(client, {
                 clientSecret: process.env.SPOTIFY_SECRET,
             } : null
         }),
-        new SoundcloudPlugin(),
+        new SoundCloudPlugin(),
         new YtDlpPlugin()
     ],
     ffmpeg: {
