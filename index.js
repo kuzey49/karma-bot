@@ -26,6 +26,10 @@ const distube = new DisTube(client, {
     plugins: [
         new SpotifyPlugin({
             emitEventsAfterFetching: true,
+            api: process.env.SPOTIFY_ID ? {
+                clientId: process.env.SPOTIFY_ID,
+                clientSecret: process.env.SPOTIFY_SECRET,
+            } : null
         }),
         new ytDlpPlugin()
     ],
@@ -289,26 +293,26 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'otorol-ayarla') {
         settings.autoRole = options.getRole('rol').id;
         await settings.save();
-        await interaction.reply({ content: `Otorol ayarlandı.`, ephemeral: true });
+        await interaction.reply({ content: `Otorol ayarlandı.`, flags: [64] });
     }
     if (commandName === 'panel-ayarla') {
         settings.memberCountChannelId = options.getChannel('kanal').id;
         await settings.save(); await updateMemberCount(guild);
-        await interaction.reply({ content: `Üye panel kanalı ayarlandı.`, ephemeral: true });
+        await interaction.reply({ content: `Üye panel kanalı ayarlandı.`, flags: [64] });
     }
     if (commandName === 'hosgeldin-ayarla') {
         settings.welcomeChannelId = options.getChannel('kanal').id;
         settings.welcomeMessage = options.getString('mesaj');
         settings.welcomeImage = options.getString('resim') || null;
         await settings.save();
-        await interaction.reply({ content: `Hoş geldin sistemi ayarlandı! Metin: ${settings.welcomeMessage}`, ephemeral: true });
+        await interaction.reply({ content: `Hoş geldin sistemi ayarlandı! Metin: ${settings.welcomeMessage}`, flags: [64] });
     }
     if (commandName === 'gorusuruz-ayarla') {
         settings.leaveChannelId = options.getChannel('kanal').id;
         settings.leaveMessage = options.getString('mesaj');
         settings.leaveImage = options.getString('resim') || null;
         await settings.save();
-        await interaction.reply({ content: `Görüşürüz sistemi ayarlandı! Metin: ${settings.leaveMessage}`, ephemeral: true });
+        await interaction.reply({ content: `Görüşürüz sistemi ayarlandı! Metin: ${settings.leaveMessage}`, flags: [64] });
     }
     if (commandName === 'ban') {
         const user = options.getUser('kisi');
@@ -316,32 +320,32 @@ client.on('interactionCreate', async interaction => {
         try {
             await guild.members.ban(user, { reason });
             await interaction.reply({ content: `${user.tag} yasaklandı.` });
-        } catch (err) { await interaction.reply({ content: `Hata! Rol sıralamasını kontrol edin.`, ephemeral: true }); }
+        } catch (err) { await interaction.reply({ content: `Hata! Rol sıralamasını kontrol edin.`, flags: [64] }); }
     }
     if (commandName === 'kufur-ekle') {
         const word = options.getString('kelime');
-        if (!settings.bannedWords.includes(word)) { settings.bannedWords.push(word); await settings.save(); await interaction.reply({ content: `Eklendi.`, ephemeral: true }); }
-        else await interaction.reply({ content: `Zaten var.`, ephemeral: true });
+        if (!settings.bannedWords.includes(word)) { settings.bannedWords.push(word); await settings.save(); await interaction.reply({ content: `Eklendi.`, flags: [64] }); }
+        else await interaction.reply({ content: `Zaten var.`, flags: [64] });
     }
     if (commandName === 'kufur-sil') {
         const word = options.getString('kelime');
         const index = settings.bannedWords.indexOf(word);
-        if (index > -1) { settings.bannedWords.splice(index, 1); await settings.save(); await interaction.reply({ content: `Silindi.`, ephemeral: true }); }
-        else await interaction.reply({ content: `Bulunamadı.`, ephemeral: true });
+        if (index > -1) { settings.bannedWords.splice(index, 1); await settings.save(); await interaction.reply({ content: `Silindi.`, flags: [64] }); }
+        else await interaction.reply({ content: `Bulunamadı.`, flags: [64] });
     }
     if (commandName === 'kufur-liste') {
-        if (settings.bannedWords.length === 0) return interaction.reply({ content: 'Liste boş.', ephemeral: true });
-        await interaction.reply({ content: `**Yasaklı Kelimeler:**\n${settings.bannedWords.join(', ')}`, ephemeral: true });
+        if (settings.bannedWords.length === 0) return interaction.reply({ content: 'Liste boş.', flags: [64] });
+        await interaction.reply({ content: `**Yasaklı Kelimeler:**\n${settings.bannedWords.join(', ')}`, flags: [64] });
     }
     if (commandName === 'sil') {
         const amount = options.getInteger('miktar');
-        if (amount < 1 || amount > 100) return interaction.reply({ content: '1 ile 100 arasında bir miktar belirtin.', ephemeral: true });
+        if (amount < 1 || amount > 100) return interaction.reply({ content: '1 ile 100 arasında bir miktar belirtin.', flags: [64] });
         
         await interaction.channel.bulkDelete(amount, true).catch(err => {
-            return interaction.reply({ content: 'Mesajlar silinirken bir hata oluştu (14 günden eski mesajlar silinemez).', ephemeral: true });
+            return interaction.reply({ content: 'Mesajlar silinirken bir hata oluştu (14 günden eski mesajlar silinemez).', flags: [64] });
         });
         
-        await interaction.reply({ content: `${amount} adet mesaj başarıyla silindi.`, ephemeral: true });
+        await interaction.reply({ content: `${amount} adet mesaj başarıyla silindi.`, flags: [64] });
     }
     if (commandName === 'sunucu-bilgi') {
         const { members, channels, roles, createdAt, ownerId } = guild;
@@ -368,7 +372,7 @@ client.on('interactionCreate', async interaction => {
         const unit = durationStr.slice(-1);
         const time = parseInt(durationStr.slice(0, -1));
         
-        if (isNaN(time) || !timeUnits[unit]) return interaction.reply({ content: 'Geçersiz süre formatı! Örnek: 10m, 1h, 1d', ephemeral: true });
+        if (isNaN(time) || !timeUnits[unit]) return interaction.reply({ content: 'Geçersiz süre formatı! Örnek: 10m, 1h, 1d', flags: [64] });
         
         const ms = time * timeUnits[unit];
         const endTimestamp = Math.floor((Date.now() + ms) / 1000);
@@ -387,18 +391,20 @@ client.on('interactionCreate', async interaction => {
                 .setStyle(ButtonStyle.Primary)
         );
         
-        const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+        const msg = await interaction.reply({ embeds: [embed], components: [row], withResponse: true });
+        // Eski sürüm desteği için interaction.fetchReply() kullanılabilir veya msg.resource.message
+        const actualMsg = msg.resource ? msg.resource.message : await interaction.fetchReply();
         
         const participants = new Set();
-        const collector = msg.createMessageComponentCollector({ time: ms });
+        const collector = actualMsg.createMessageComponentCollector({ time: ms });
         
         collector.on('collect', i => {
             if (i.customId === 'cekilis-katil') {
                 if (participants.has(i.user.id)) {
-                    return i.reply({ content: 'Zaten çekilişe katıldın!', ephemeral: true });
+                    return i.reply({ content: 'Zaten çekilişe katıldın!', flags: [64] });
                 }
                 participants.add(i.user.id);
-                i.reply({ content: 'Başarıyla katıldın! 🎉', ephemeral: true });
+                i.reply({ content: 'Başarıyla katıldın! 🎉', flags: [64] });
             }
         });
         
@@ -406,7 +412,7 @@ client.on('interactionCreate', async interaction => {
             const winners = Array.from(participants).sort(() => 0.5 - Math.random()).slice(0, winnerCount);
             
             if (winners.length === 0) {
-                await msg.edit({ components: [] });
+                await actualMsg.edit({ components: [] });
                 return interaction.channel.send(`Çekiliş sona erdi! Maalesef kimse katılmadı. Ödül: **${prize}**`);
             }
             
@@ -417,7 +423,7 @@ client.on('interactionCreate', async interaction => {
                 .setColor('Green')
                 .setTimestamp();
                 
-            await msg.edit({ embeds: [winEmbed], components: [] });
+            await actualMsg.edit({ embeds: [winEmbed], components: [] });
             interaction.channel.send(`Tebrikler ${winnerMention}! **${prize}** çekilişini kazandınız! 🎉`);
         });
     }
@@ -427,9 +433,9 @@ client.on('interactionCreate', async interaction => {
         const query = options.getString('şarkı');
         const voiceChannel = interaction.member.voice.channel;
         
-        if (!voiceChannel) return interaction.reply({ content: 'Önce bir ses kanalına katılmalısın!', ephemeral: true });
+        if (!voiceChannel) return interaction.reply({ content: 'Önce bir ses kanalına katılmalısın!', flags: [64] });
         
-        await interaction.reply({ content: '🔍 Şarkı aranıyor...', ephemeral: true });
+        await interaction.reply({ content: '🔍 Şarkı aranıyor...', flags: [64] });
         
         try {
             await distube.play(voiceChannel, query, {
