@@ -31,10 +31,7 @@ const distube = new DisTube(client, {
             } : null
         }),
         new YtDlpPlugin()
-    ],
-    emitNewSongOnly: true,
-    leaveOnEmpty: true,
-    leaveOnFinish: true,
+    ]
 });
 
 distube.on('playSong', (queue, song) => {
