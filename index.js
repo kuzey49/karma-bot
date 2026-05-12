@@ -20,6 +20,7 @@ const client = new Client({
 
 const { DisTube } = require('distube');
 const { SpotifyPlugin } = require('@distube/spotify');
+const { SoundcloudPlugin } = require('@distube/soundcloud');
 const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 const distube = new DisTube(client, {
@@ -30,6 +31,7 @@ const distube = new DisTube(client, {
                 clientSecret: process.env.SPOTIFY_SECRET,
             } : null
         }),
+        new SoundcloudPlugin(),
         new YtDlpPlugin()
     ],
     ffmpeg: {
@@ -39,9 +41,10 @@ const distube = new DisTube(client, {
         highWaterMark: 1 << 25,
         filter: 'audioonly',
         quality: 'highestaudio',
-        headers: process.env.YOUTUBE_COOKIES ? {
-            Cookie: process.env.YOUTUBE_COOKIES
-        } : {}
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            ...(process.env.YOUTUBE_COOKIES ? { 'Cookie': process.env.YOUTUBE_COOKIES } : {})
+        }
     }
 });
 
