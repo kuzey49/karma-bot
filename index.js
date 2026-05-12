@@ -73,7 +73,7 @@ const commands = [
         description: 'Hoş geldin mesajını ayarlar',
         options: [
             { name: 'kanal', type: 7, description: 'Kanal', required: true },
-            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: üye sayısı, {sunucu}: sunucu ismi)', required: true },
+            { name: 'mesaj', type: 3, description: 'Mesaj ({üye}: etiket, {sayı}: sayı, {sunucu}: sunucu ismi)', required: true },
             { name: 'resim', type: 3, description: 'Resim URL (opsiyonel)', required: false }
         ],
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
@@ -140,15 +140,17 @@ client.on('guildMemberAdd', async member => {
         const channel = await member.guild.channels.fetch(settings.welcomeChannelId).catch(() => null);
         if (channel) {
             const formattedMsg = settings.welcomeMessage
-                .replaceAll('{üye}', `<@${member.id}>`)
-                .replaceAll('{sayı}', member.guild.memberCount.toString())
-                .replaceAll('{sunucu}', member.guild.name);
+                .replace(/{üye}/g, `<@${member.id}>`)
+                .replace(/{sayı}/g, member.guild.memberCount.toString())
+                .replace(/{kişi}/g, member.guild.memberCount.toString())
+                .replace(/{sunucu}/g, member.guild.name);
 
             const embed = new EmbedBuilder()
                 .setColor('#00ff00')
                 .setTitle(`Sunucumuza Hoş Geldin!`)
                 .setDescription(formattedMsg)
                 .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setFooter({ text: `Seninle birlikte ${member.guild.memberCount} kişiyiz! | ${member.guild.name}`, iconURL: member.guild.iconURL() })
                 .setTimestamp();
 
             if (settings.welcomeImage) embed.setImage(settings.welcomeImage);
@@ -165,15 +167,17 @@ client.on('guildMemberRemove', async member => {
         const channel = await member.guild.channels.fetch(settings.leaveChannelId).catch(() => null);
         if (channel) {
             const formattedMsg = settings.leaveMessage
-                .replaceAll('{üye}', `**${member.user.tag}**`)
-                .replaceAll('{sayı}', member.guild.memberCount.toString())
-                .replaceAll('{sunucu}', member.guild.name);
+                .replace(/{üye}/g, `**${member.user.tag}**`)
+                .replace(/{sayı}/g, member.guild.memberCount.toString())
+                .replace(/{kişi}/g, member.guild.memberCount.toString())
+                .replace(/{sunucu}/g, member.guild.name);
 
             const embed = new EmbedBuilder()
                 .setColor('#ff0000')
                 .setTitle(`Görüşürüz!`)
                 .setDescription(formattedMsg)
                 .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setFooter({ text: `Gidişinle ${member.guild.memberCount} kişi kaldık.`, iconURL: member.guild.iconURL() })
                 .setTimestamp();
 
             if (settings.leaveImage) embed.setImage(settings.leaveImage);
